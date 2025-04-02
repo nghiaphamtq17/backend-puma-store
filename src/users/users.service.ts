@@ -1,60 +1,107 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import {
   Injectable,
-  ConflictException,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from './user.entity';
+import { UserEntity } from './user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
-import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcrypt';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { LoginDto } from './dto/login.dto';
 import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class UsersService {
   constructor(
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
-    private jwtService: JwtService,
+    @InjectRepository(UserEntity)
+    private readonly usersRepository: Repository<UserEntity>,
+    private readonly jwtService: JwtService,
   ) {}
 
-  async register(createUserDto: CreateUserDto): Promise<User> {
-    const { username, password, ...rest } = createUserDto;
-
-    // Check if user exists
-    const userExists = await this.userRepository.findOne({
-      where: { username },
-    });
-    if (userExists) {
-      throw new ConflictException('Username already exists');
+  async create(
+    createUserDto: CreateUserDto,
+  ): Promise<{ user: UserEntity; token: string }> {
+    const existingUser =
+      (await this.findByPhoneOrEmail(createUserDto.phone)) ||
+      (await this.findByPhoneOrEmail(createUserDto.email));
+    if (existingUser) {
+      throw new UnauthorizedException(
+        'User with this phone or email already exists',
+      );
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt();
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // Create new user
-    const user = this.userRepository.create({
-      username,
+    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+    const user = this.usersRepository.create({
+      ...createUserDto,
       password: hashedPassword,
-      ...rest,
     });
+    // Tạo token
+    const payload = { username: user.email, sub: user.id };
+    const token = this.jwtService.sign(payload);
+    const newUser = await this.usersRepository.save(user);
 
-    return this.userRepository.save(user);
+    return { user: newUser, token };
   }
 
-  async login(loginDto: LoginDto): Promise<{ accessToken: string; user: any }> {
-    const { username, password } = loginDto;
-    const user = await this.userRepository.findOne({ where: { username } });
+  async findAll(): Promise<UserEntity[]> {
+    return await this.usersRepository.find();
+  }
 
-    if (user && (await bcrypt.compare(password, user.password))) {
-      const payload = { username: user.username, sub: user.id };
-      const accessToken = this.jwtService.sign(payload);
-      return { accessToken, user: user };
+  async findOne(id: string): Promise<UserEntity> {
+    const user = await this.usersRepository.findOne({ where: { id } });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+    return user;
+  }
+  async findByPhoneOrEmail(phoneOrEmail: string): Promise<UserEntity | null> {
+    return await this.usersRepository.findOne({
+      where: [{ phone: phoneOrEmail }, { email: phoneOrEmail }],
+    });
+  }
+
+  async update(id: string, updateUserDto: UpdateUserDto): Promise<UserEntity> {
+    const user = await this.findOne(id);
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
     }
 
-    throw new UnauthorizedException('Invalid credentials');
+    if (updateUserDto.password) {
+      updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
+    }
+
+    await this.usersRepository.update(id, updateUserDto);
+    return await this.findOne(id);
+  }
+
+  async remove(id: string): Promise<void> {
+    const user = await this.findOne(id);
+    await this.usersRepository.remove(user);
+  }
+
+  async login(loginDto: LoginDto) {
+    const user = await this.findByPhoneOrEmail(loginDto.user);
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const isPasswordValid = await bcrypt.compare(
+      loginDto.password,
+      user.password,
+    );
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Tạo token
+    const payload = { username: user.email, sub: user.id };
+    const token = this.jwtService.sign(payload);
+
+    // Remove password from response
+    const { password, ...result } = user;
+    return { user: { ...result }, token };
   }
 }

@@ -6,7 +6,8 @@ export const typeOrmConfig: TypeOrmModuleOptions = {
   port: 3306,
   username: 'root',
   password: 'halloween',
-  database: 'nestjs',
+  database: 'HeavyHire',
   entities: [__dirname + '/../**/*.entity.{js,ts}'],
-  synchronize: true,
+  migrations: ['src/migrations/*.ts'],
+  synchronize: false,
 };

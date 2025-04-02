@@ -1,30 +1,56 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { Exclude } from 'class-transformer';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
-@Entity()
-export class User {
-  @PrimaryGeneratedColumn()
-  id: number;
+@Entity('users')
+export class UserEntity {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-  @Column({ unique: true })
-  username: string;
+  @Column({ type: 'enum', enum: ['customer', 'owner'], default: 'customer' })
+  role: 'customer' | 'owner';
 
-  @Column()
-  full_name: string;
+  @Column({
+    type: 'enum',
+    enum: ['individual', 'company'],
+    default: 'individual',
+  })
+  type: 'individual' | 'company';
 
-  @Column({ unique: true })
-  phone_number: string;
+  @Column({ type: 'varchar', length: 255 })
+  name: string;
 
-  @Column()
-  @Exclude()
+  @Column({ type: 'varchar', length: 255, unique: true })
+  email: string;
+
+  @Column({ type: 'varchar', length: 20, unique: true })
+  phone: string;
+
+  @Column({ type: 'varchar', length: 255 })
   password: string;
 
-  @Column()
+  @Column({ type: 'text', nullable: true })
   address: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  representative_name?: string;
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  representative_phone?: string;
+
+  @Column({ type: 'json', nullable: true })
+  documents?: Array<{ type: string; file_url: string }>;
+
+  @Column({ type: 'json', nullable: true })
+  avatar?: string;
 
   @CreateDateColumn()
   created_at: Date;
 
   @UpdateDateColumn()
   updated_at: Date;
-} 
+}

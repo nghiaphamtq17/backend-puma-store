@@ -5,37 +5,43 @@ import {
   IsOptional,
   IsArray,
   ValidateNested,
-  MinLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class DocumentDto {
   @IsString()
-  type: string;
+  @IsOptional()
+  type?: string;
 
   @IsString()
-  file_url: string;
+  @IsOptional()
+  file_url?: string;
 }
 
-export class CreateUserDto {
+export class UpdateUserDto {
   @IsEnum(['customer', 'owner'])
-  role: 'customer' | 'owner';
+  @IsOptional()
+  role?: 'customer' | 'owner';
 
   @IsEnum(['individual', 'company'])
-  type: 'individual' | 'company';
+  @IsOptional()
+  type?: 'individual' | 'company';
 
   @IsString()
-  name: string;
+  @IsOptional()
+  name?: string;
 
   @IsEmail()
-  email: string;
+  @IsOptional()
+  email?: string;
 
   @IsString()
-  phone: string;
+  @IsOptional()
+  phone?: string;
 
   @IsString()
-  @MinLength(6)
-  password: string;
+  @IsOptional()
+  password?: string;
 
   @IsString()
   @IsOptional()
